@@ -149,11 +149,20 @@ func (s Signature) String() string {
 		}
 	}
 	buf.WriteByte(')')
+	if len(s.Modifiers) > 0 {
+		buf.WriteString(" ")
+		for i, m := range s.Modifiers {
+			buf.WriteString(m)
+			if i < len(s.Modifiers)-1 {
+				buf.WriteString(" ")
+			}
+		}
+	}
 	if len(s.Outputs) > 0 {
-		buf.WriteByte('(')
+		buf.WriteString(" returns (")
 		for i, c := range s.Outputs {
 			buf.WriteString(c.String())
-			if i < len(s.Inputs)-1 {
+			if i < len(s.Outputs)-1 {
 				buf.WriteString(", ")
 			}
 		}
@@ -208,22 +217,6 @@ func (p Parameter) String() string {
 	return buf.String()
 }
 
-func (p Parameter) copy() Parameter {
-	cpy := Parameter{
-		Name:         p.Name,
-		Type:         p.Type,
-		Indexed:      p.Indexed,
-		DataLocation: p.DataLocation,
-	}
-	cpy.Arrays = make([]int, len(p.Arrays))
-	cpy.Tuple = make([]Parameter, len(p.Tuple))
-	copy(cpy.Arrays, p.Arrays)
-	for i := range p.Tuple {
-		cpy.Tuple[i] = p.Tuple[i].copy()
-	}
-	return cpy
-}
-
 type parser struct {
 	in  []byte
 	pos int
@@ -268,16 +261,11 @@ func (p *parser) parseSignature() (Signature, error) {
 		if len(sig.Name) > 0 {
 			return Signature{}, fmt.Errorf(`unexpected fallback name %q`, sig.Name)
 		}
-		if len(sig.Inputs) == 1 && sig.Inputs[0].String() != "bytes" {
-			return Signature{}, fmt.Errorf(`unexpected fallback input type %q`, sig.Inputs[0].String())
-		}
-		if len(sig.Inputs) > 1 {
+		validInOut := len(sig.Inputs) == 1 && sig.Inputs[0].Type == "bytes" && len(sig.Outputs) == 1 && sig.Outputs[0].Type == "bytes"
+		if !validInOut && len(sig.Inputs) > 0 {
 			return Signature{}, fmt.Errorf(`unexpected fallback inputs`)
 		}
-		if len(sig.Outputs) == 1 && sig.Outputs[0].String() != "bytes" {
-			return Signature{}, fmt.Errorf(`unexpected fallback output type %q`, sig.Outputs[0].String())
-		}
-		if len(sig.Outputs) > 1 {
+		if !validInOut && len(sig.Outputs) > 0 {
 			return Signature{}, fmt.Errorf(`unexpected fallback outputs`)
 		}
 	case ReceiveKind:
@@ -379,6 +367,9 @@ func (p *parser) parseOutputs() ([]Parameter, error) {
 		p.parseWhitespace()
 	}
 	if returnsKeyword && !p.peekByte('(') {
+		if !p.hasNext() {
+			return nil, fmt.Errorf(`unexpected end of input, expected '(' after 'returns' keyword`)
+		}
 		return nil, fmt.Errorf(`unexpected token %q, expected '(' after 'returns' keyword`, p.peek())
 	}
 	if p.peekByte('(') {
@@ -426,6 +417,8 @@ func (p *parser) parseParameter() (Parameter, error) {
 	// elementary types start with a letter and composite types start with
 	// a parenthesis. We can use this fact to distinguish between the two.
 	switch {
+	case !p.hasNext():
+		return Parameter{}, fmt.Errorf(`unexpected end of input, type expected`)
 	case isAlpha(p.peek()) || isIdentifierSymbol(p.peek()):
 		arg, err = p.parseElementaryType()
 		if err != nil {
@@ -473,10 +466,10 @@ func (p *parser) parseParameter() (Parameter, error) {
 // declarations.
 func (p *parser) parseCompositeType() (Parameter, error) {
 	if !p.readByte('(') {
+		if !p.hasNext() {
+			return Parameter{}, fmt.Errorf(`unexpected end of input, expected '('`)
+		}
 		return Parameter{}, fmt.Errorf(`unexpected token %q, '(' expected`, p.peek())
-	}
-	if !p.hasNext() {
-		return Parameter{}, fmt.Errorf(`unexpected end of input, composite type expected`)
 	}
 	var arg Parameter
 	p.parseWhitespace()
@@ -495,6 +488,9 @@ func (p *parser) parseCompositeType() (Parameter, error) {
 			}
 			if p.readByte(')') {
 				break
+			}
+			if !p.hasNext() {
+				return Parameter{}, fmt.Errorf(`unexpected end of input, ',' or ')' expected`)
 			}
 			return Parameter{}, fmt.Errorf(`unexpected token %q, ',' or ')' expected`, p.peek())
 		}
@@ -572,22 +568,22 @@ func (p *parser) parseName() []byte {
 // parseNumber parses decimal number from the input. The parsed number is
 // returned as integer. If there was no number to parse, the false is returned
 // as second value.
-func (p *parser) parseNumber() (int, bool) {
+func (p *parser) parseNumber() (int, bool, error) {
 	pos := p.pos
 	for p.hasNext() {
-		if isDigit(p.peek()) {
-			p.read()
+		if !isDigit(p.peek()) {
+			break
 		}
-		break
+		p.read()
 	}
 	if pos == p.pos {
-		return 0, false
+		return 0, false, nil
 	}
-	n, err := strconv.ParseUint(string(p.in[pos:p.pos]), 10, 0)
+	n, err := strconv.ParseInt(string(p.in[pos:p.pos]), 10, 0)
 	if err != nil {
-		return 0, false
+		return 0, false, err
 	}
-	return int(n), true
+	return int(n), true, nil
 }
 
 // parseArray parses array part of the type declaration. It returns a slice
@@ -596,11 +592,20 @@ func (p *parser) parseArray() ([]int, error) {
 	var arr []int
 	for p.hasNext() {
 		if p.readByte('[') {
-			n, ok := p.parseNumber()
+			n, ok, err := p.parseNumber()
+			if err != nil {
+				return nil, fmt.Errorf(`invalid array size: %v`, err)
+			}
+			if ok && n <= 0 {
+				return nil, fmt.Errorf(`invalid array size: %d`, n)
+			}
 			if ok {
 				arr = append(arr, n)
 			} else {
 				arr = append(arr, -1)
+			}
+			if !p.hasNext() {
+				return nil, fmt.Errorf(`unexpected end of input, ']' expected`)
 			}
 			if !p.readByte(']') {
 				return nil, fmt.Errorf(`unexpected token %q, ']' expected`, p.peek())
