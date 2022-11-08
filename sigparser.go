@@ -33,6 +33,9 @@ import (
 //  - receive()
 //  - event Foo(uint256 a, uint256 b)
 //  - error Foo(uint256 a, uint256 b)
+//
+// Signatures that are syntactically correct, but semantically invalid are
+// rejected by the parser.
 func ParseSignature(signature string) (Signature, error) {
 	p := &parser{in: []byte(signature)}
 	p.parseWhitespace()
@@ -47,8 +50,8 @@ func ParseSignature(signature string) (Signature, error) {
 	return sig, nil
 }
 
-// ParseParameter parses the type and returns its definition. The syntax is the same
-// as in Solidity.
+// ParseParameter parses the type and returns its definition. The syntax is
+// similar to that of Solidity, but the names can be omitted.
 func ParseParameter(signature string) (Parameter, error) {
 	p := &parser{in: []byte(signature)}
 	p.parseWhitespace()
@@ -63,6 +66,8 @@ func ParseParameter(signature string) (Parameter, error) {
 	return typ, nil
 }
 
+// SignatureKind is the kind of the signature, like function, constructor,
+// fallback, etc.
 type SignatureKind int8
 
 const (
@@ -74,6 +79,8 @@ const (
 	ErrorKind
 )
 
+// DataLocation is the data location of the parameter, like storage, memory
+// or calldata.
 type DataLocation int8
 
 const (
@@ -88,13 +95,17 @@ const (
 type Signature struct {
 	// Kind is the kind of the signature.
 	Kind SignatureKind
+
 	// Name is the name of the function, event or error. It should be empty for
 	// fallback, receive and constructor kinds.
 	Name string
+
 	// Inputs is the list of input argument types.
 	Inputs []Parameter
+
 	// Outputs is the list of output value types.
 	Outputs []Parameter
+
 	// Modifiers is the list of function modifiers.
 	Modifiers []string
 }
@@ -103,17 +114,23 @@ type Signature struct {
 type Parameter struct {
 	// Name is an optional name of the argument or return value.
 	Name string
-	// Type is the name of the type, e.g. uint256, address, etc.
+
+	// Type is the parameter type, like uint256, bytes32, etc. It must
+	// be empty for tuples.
 	Type string
+
 	// Tuple is a list tuple elements. It must be empty for non-tuple types.
 	Tuple []Parameter
+
 	// Arrays is the list of array dimensions, where each dimension is the
 	// maximum length of the array. If the length is -1, the array is
 	// unbounded. If the Arrays is empty, the argument is not an array.
 	Arrays []int
-	// Indexed indicates whether the argument is indexed. It should be false
+
+	// Indexed indicates whether the argument is indexed. It must be false
 	// for types other than event.
 	Indexed bool
+
 	// DataLocation indicates the data location of the argument. It should be
 	// UnspecifiedLocation for types other than function and constructor.
 	DataLocation DataLocation
