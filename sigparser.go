@@ -12,6 +12,9 @@ import (
 // strict. The argument names are always optional, and the return keyword can
 // be omitted.
 //
+// Tuples are represented as a list of types enclosed in parentheses, optionally
+// prefixed with the "tuple" keyword.
+//
 // Signature can be prepended with the keyword describing the signature kind.
 // If the kind is not specified, it is assumed to be a function.
 // The following kinds are supported:
@@ -25,9 +28,9 @@ import (
 //
 // The following examples are valid signatures:
 //
-//  - function foo(uint256 memory a, uint256 memory b) internal returns (uint256)
-//  - function foo(uint256 a, uint256 b) (uint256)
-//  - foo(uint256,uint256)(uint256)
+//  - function foo(uint256 memory a, tuple(uint256 b1, uint256 b2) memory b) internal returns (uint256)
+//  - function foo(uint256 a, (uint256 b1, uint256 b2) b) (uint256)
+//  - foo(uint256,(uint256,uint256))(uint256)
 //  - constructor(uint256 a, uint256 b)
 //  - fallback(bytes memory a) returns (bytes memory)
 //  - receive()
@@ -45,13 +48,13 @@ func ParseSignature(signature string) (Signature, error) {
 	}
 	p.parseWhitespace()
 	if p.hasNext() {
-		return Signature{}, fmt.Errorf(`unexpected token %q at the end of the signature`, p.peek())
+		return Signature{}, fmt.Errorf(`unexpected character %q at the end of the signature`, p.peek())
 	}
 	return sig, nil
 }
 
-// ParseParameter parses the type and returns its definition. The syntax is
-// similar to that of Solidity, but the names can be omitted.
+// ParseParameter parses the single parameter. The syntax is same as for
+// parameters in the ParseSignature function.
 func ParseParameter(signature string) (Parameter, error) {
 	p := &parser{in: []byte(signature)}
 	p.parseWhitespace()
@@ -61,7 +64,7 @@ func ParseParameter(signature string) (Parameter, error) {
 	}
 	p.parseWhitespace()
 	if p.hasNext() {
-		return Parameter{}, fmt.Errorf(`unexpected token %q at the end of the type definition`, p.peek())
+		return Parameter{}, fmt.Errorf(`unexpected character %q at the end of the parameter`, p.peek())
 	}
 	return typ, nil
 }
@@ -100,10 +103,10 @@ type Signature struct {
 	// fallback, receive and constructor kinds.
 	Name string
 
-	// Inputs is the list of input argument types.
+	// Inputs is the list of input parameters.
 	Inputs []Parameter
 
-	// Outputs is the list of output value types.
+	// Outputs is the list of output parameters.
 	Outputs []Parameter
 
 	// Modifiers is the list of function modifiers.
@@ -387,7 +390,7 @@ func (p *parser) parseOutputs() ([]Parameter, error) {
 		if !p.hasNext() {
 			return nil, fmt.Errorf(`unexpected end of input, expected '(' after 'returns' keyword`)
 		}
-		return nil, fmt.Errorf(`unexpected token %q, expected '(' after 'returns' keyword`, p.peek())
+		return nil, fmt.Errorf(`unexpected character %q, expected '(' after 'returns' keyword`, p.peek())
 	}
 	if p.peekByte('(') {
 		// Return types list have exactly the same syntax as composite type,
@@ -430,24 +433,25 @@ func (p *parser) parseParameter() (Parameter, error) {
 		err error
 		arg Parameter
 	)
-	// Parameter can be either a composite type or an elementary type. All
-	// elementary types start with a letter and composite types start with
-	// a parenthesis. We can use this fact to distinguish between the two.
+	// Parameter can be either a composite type or an elementary type.
+	// The composite types start with a parenthesis, or a "tuple" keyword
+	// followed by a parenthesis. All elementary types start with a letter.
+	// We can use this fact to distinguish between the two.
 	switch {
 	case !p.hasNext():
 		return Parameter{}, fmt.Errorf(`unexpected end of input, type expected`)
+	case p.peekByte('(') || p.peekBytes([]byte("tuple(")):
+		arg, err = p.parseCompositeType()
+		if err != nil {
+			return Parameter{}, err
+		}
 	case isAlpha(p.peek()) || isIdentifierSymbol(p.peek()):
 		arg, err = p.parseElementaryType()
 		if err != nil {
 			return Parameter{}, err
 		}
-	case p.peekByte('('):
-		arg, err = p.parseCompositeType()
-		if err != nil {
-			return Parameter{}, err
-		}
 	default:
-		return Parameter{}, fmt.Errorf(`unexpected token %q, type expected`, p.peek())
+		return Parameter{}, fmt.Errorf(`unexpected character %q, type expected`, p.peek())
 	}
 	// Parse data location, indexed flag and name.
 	if p.hasNext() && isWhitespace(p.peek()) {
@@ -482,11 +486,11 @@ func (p *parser) parseParameter() (Parameter, error) {
 // parseCompositeType parses composite type argument along with optional array
 // declarations.
 func (p *parser) parseCompositeType() (Parameter, error) {
-	if !p.readByte('(') {
+	if !p.readByte('(') && !p.readBytes([]byte("tuple(")) {
 		if !p.hasNext() {
-			return Parameter{}, fmt.Errorf(`unexpected end of input, expected '('`)
+			return Parameter{}, fmt.Errorf(`unexpected end of input, 'tuple(' or '(' expected`)
 		}
-		return Parameter{}, fmt.Errorf(`unexpected token %q, '(' expected`, p.peek())
+		return Parameter{}, fmt.Errorf(`unexpected character %q, 'tuple(' or '(' expected`, p.peek())
 	}
 	var arg Parameter
 	p.parseWhitespace()
@@ -509,7 +513,7 @@ func (p *parser) parseCompositeType() (Parameter, error) {
 			if !p.hasNext() {
 				return Parameter{}, fmt.Errorf(`unexpected end of input, ',' or ')' expected`)
 			}
-			return Parameter{}, fmt.Errorf(`unexpected token %q, ',' or ')' expected`, p.peek())
+			return Parameter{}, fmt.Errorf(`unexpected character %q, ',' or ')' expected`, p.peek())
 		}
 	}
 	// Parse array declarations, if any.
@@ -625,7 +629,7 @@ func (p *parser) parseArray() ([]int, error) {
 				return nil, fmt.Errorf(`unexpected end of input, ']' expected`)
 			}
 			if !p.readByte(']') {
-				return nil, fmt.Errorf(`unexpected token %q, ']' expected`, p.peek())
+				return nil, fmt.Errorf(`unexpected character %q, ']' expected`, p.peek())
 			}
 			continue
 		}

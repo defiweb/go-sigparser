@@ -133,6 +133,14 @@ func TestParseSignature(t *testing.T) {
 				Outputs: []Parameter{{Type: "", Tuple: []Parameter{{Type: "uint256", Name: "a"}, {Type: "bool", Name: "b"}}, Name: "c"}},
 			},
 		},
+		// Alternative tuple syntax
+		{
+			sig: "foo(tuple(uint256,bool))", // with one tuple argument
+			want: Signature{
+				Name:   "foo",
+				Inputs: []Parameter{{Type: "", Tuple: []Parameter{{Type: "uint256"}, {Type: "bool"}}}},
+			},
+		},
 		// Arrays
 		{
 			sig: "foo(uint256[])", // with one array argument
@@ -525,6 +533,7 @@ func FuzzParseSignature(f *testing.F) {
 		"[",
 		"]",
 		",",
+		"tuple",
 		"indexed",
 		"storage",
 		"memory",
@@ -550,6 +559,7 @@ func FuzzParseParameter(f *testing.F) {
 		"[",
 		"]",
 		",",
+		"tuple",
 		"indexed",
 		"storage",
 		"memory",

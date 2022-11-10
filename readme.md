@@ -4,12 +4,14 @@ The `go-sigparser` package provides a parser of Ethereum function, event and err
 
 The parser is based on the Solidity grammar, but allows to omit argument names and the `returns` and `function`
 keywords, so it can parse full Solidity signatures as well as short signatures like: `bar(uint256,bytes32)`.
+Tuples are represented as a list of parameters, e.g. `(uint256,bytes32)`. The list can be optionally prefixed with
+`tuple` keyword, e.g. `tuple(uint256,bytes32)`.
 
 Examples of signatures that are supported by the parser:
 
 - `getPrice(string)`
 - `getPrice(string)((uint256,unit256))`
-- `function getPrice(string calldata symbol) external view returns ((uint256 price, uint256 timestamp) result)`
+- `function getPrice(string calldata symbol) external view returns (tuple(uint256 price, uint256 timestamp) result)`
 - `constructor(string symbol, string name)`
 - `receive() external payable`
 - `fallback (bytes calldata input) external payable returns (bytes memory output)`
