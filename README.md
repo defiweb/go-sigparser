@@ -41,12 +41,12 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println(sig.Kind)                     // FunctionKind
+	fmt.Println(sig.Kind)                     // function
 	fmt.Println(sig.Name)                     // getPrice
 	fmt.Println(sig.Inputs[0].Name)           // symbol
 	fmt.Println(sig.Inputs[0].Type)           // string
 	fmt.Println(sig.Inputs[0].Arrays)         // [-1] (-1 means that the array is unbounded)
-	fmt.Println(sig.Inputs[0].DataLocation)   // CallData
+	fmt.Println(sig.Inputs[0].DataLocation)   // calldata
 	fmt.Println(sig.Modifiers)                // [external, view]
 	fmt.Println(sig.Outputs[0].Name)          // result
 	fmt.Println(sig.Outputs[0].Arrays)        // [-1] 

@@ -251,6 +251,7 @@ func TestParseSignature(t *testing.T) {
 				Outputs:   []Parameter{{Type: "int"}},
 			},
 		},
+		//
 		// Allowed arguments for fallback function
 		{
 			sig: "fallback (bytes calldata _input) external returns (bytes memory _output)",
@@ -281,6 +282,7 @@ func TestParseSignature(t *testing.T) {
 		{
 			sig: "\t\nfunction\t\nfoo\t(t1\nn1,(t2\tn2,t3\nn3))\treturns\n(t4\nn4,(t5\tn5,t6\nn6))\t",
 			want: Signature{
+				Kind:    FunctionKind,
 				Name:    "foo",
 				Inputs:  []Parameter{{Type: "t1", Name: "n1"}, {Type: "", Tuple: []Parameter{{Type: "t2", Name: "n2"}, {Type: "t3", Name: "n3"}}}},
 				Outputs: []Parameter{{Type: "t4", Name: "n4"}, {Type: "", Tuple: []Parameter{{Type: "t5", Name: "n5"}, {Type: "t6", Name: "n6"}}}},
@@ -290,6 +292,7 @@ func TestParseSignature(t *testing.T) {
 		{
 			sig: "function foo(((int[][1][2] a,int[][1][2] b)[][1][2],(int[][1][2] a,int[][1][2] b)[][1][2])[][1][2])",
 			want: Signature{
+				Kind: FunctionKind,
 				Name: "foo",
 				Inputs: []Parameter{
 					{
@@ -316,7 +319,7 @@ func TestParseSignature(t *testing.T) {
 		},
 
 		// Signatures with a valid syntax but invalid semantics
-		{sig: "foo(int indexed a)", wantErr: true},              // indexed flag not allowed for non-events
+		{sig: "function foo(int indexed a)", wantErr: true},     // indexed flag not allowed for non-events
 		{sig: "foo()(int indexed a)", wantErr: true},            // indexed flag not allowed for output values
 		{sig: "foo()[1]", wantErr: true},                        // input tuples cannot be arrays
 		{sig: "foo()(int)[1]", wantErr: true},                   // output tuples cannot be arrays
@@ -332,7 +335,7 @@ func TestParseSignature(t *testing.T) {
 		{sig: "receive() returns (uint256)", wantErr: true},     // receives cannot have return values
 		{sig: "event foo()", wantErr: true},                     // events must have arguments
 		{sig: "event foo(int) internal", wantErr: true},         // events cannot have modifiers
-		{sig: "event foo() returns (int)", wantErr: true},       // events cannot have return values
+		{sig: "event foo(int) returns (int)", wantErr: true},    // events cannot have return values
 		{sig: "event foo(int memory a)", wantErr: true},         // event arguments cannot specify data location
 		{sig: "error foo()", wantErr: true},                     // errors must have arguments
 		{sig: "error foo(int) internal", wantErr: true},         // errors cannot have modifiers
@@ -487,28 +490,29 @@ func TestSignatureString(t *testing.T) {
 		sig  Signature
 		want string
 	}{
-		{sig: mustParseSignature(t, "foo"), want: "function foo()"},
+		{sig: mustParseSignature(t, "foo"), want: "foo()"},
+		{sig: mustParseSignature(t, "function foo"), want: "function foo()"},
 		{sig: mustParseSignature(t, "constructor()"), want: "constructor()"},
 		{sig: mustParseSignature(t, "fallback()"), want: "fallback()"},
 		{sig: mustParseSignature(t, "receive()"), want: "receive()"},
 		{sig: mustParseSignature(t, "event foo(int)"), want: "event foo(int)"},
 		{sig: mustParseSignature(t, "error foo(int)"), want: "error foo(int)"},
-		{sig: mustParseSignature(t, "foo(int)"), want: "function foo(int)"},
-		{sig: mustParseSignature(t, "foo(int a, int b)"), want: "function foo(int a, int b)"},
-		{sig: mustParseSignature(t, "foo(int[][1][2] a)"), want: "function foo(int[][1][2] a)"},
-		{sig: mustParseSignature(t, "foo()(int)"), want: "function foo() returns (int)"},
-		{sig: mustParseSignature(t, "foo()(int a)"), want: "function foo() returns (int a)"},
-		{sig: mustParseSignature(t, "foo()(int a, int b)"), want: "function foo() returns (int a, int b)"},
-		{sig: mustParseSignature(t, "foo()(int[][1][2] a)"), want: "function foo() returns (int[][1][2] a)"},
-		{sig: mustParseSignature(t, "foo(int storage)"), want: "function foo(int storage)"},
-		{sig: mustParseSignature(t, "foo(int memory)"), want: "function foo(int memory)"},
-		{sig: mustParseSignature(t, "foo(int calldata)"), want: "function foo(int calldata)"},
+		{sig: mustParseSignature(t, "foo(int)"), want: "foo(int)"},
+		{sig: mustParseSignature(t, "foo(int a, int b)"), want: "foo(int a, int b)"},
+		{sig: mustParseSignature(t, "foo(int[][1][2] a)"), want: "foo(int[][1][2] a)"},
+		{sig: mustParseSignature(t, "foo()(int)"), want: "foo() returns (int)"},
+		{sig: mustParseSignature(t, "foo()(int a)"), want: "foo() returns (int a)"},
+		{sig: mustParseSignature(t, "foo()(int a, int b)"), want: "foo() returns (int a, int b)"},
+		{sig: mustParseSignature(t, "foo()(int[][1][2] a)"), want: "foo() returns (int[][1][2] a)"},
+		{sig: mustParseSignature(t, "foo(int storage)"), want: "foo(int storage)"},
+		{sig: mustParseSignature(t, "foo(int memory)"), want: "foo(int memory)"},
+		{sig: mustParseSignature(t, "foo(int calldata)"), want: "foo(int calldata)"},
 		{sig: mustParseSignature(t, "event foo(int indexed)"), want: "event foo(int indexed)"},
-		{sig: mustParseSignature(t, "foo(int storage a)"), want: "function foo(int storage a)"},
-		{sig: mustParseSignature(t, "foo() internal pure"), want: "function foo() internal pure"},
-		{sig: mustParseSignature(t, "foo() internal pure (int)"), want: "function foo() internal pure returns (int)"},
-		{sig: mustParseSignature(t, "foo((int,int))"), want: "function foo((int, int))"},
-		{sig: mustParseSignature(t, "foo((int,int)[])"), want: "function foo((int, int)[])"},
+		{sig: mustParseSignature(t, "foo(int storage a)"), want: "foo(int storage a)"},
+		{sig: mustParseSignature(t, "foo() internal pure"), want: "foo() internal pure"},
+		{sig: mustParseSignature(t, "foo() internal pure (int)"), want: "foo() internal pure returns (int)"},
+		{sig: mustParseSignature(t, "foo((int,int))"), want: "foo((int, int))"},
+		{sig: mustParseSignature(t, "foo((int,int)[])"), want: "foo((int, int)[])"},
 	}
 	for n, tt := range tests {
 		t.Run(fmt.Sprintf("case-%d", n+1), func(t *testing.T) {

@@ -74,13 +74,33 @@ func ParseParameter(signature string) (Parameter, error) {
 type SignatureKind int8
 
 const (
-	FunctionKind SignatureKind = iota
+	UnknownKind SignatureKind = iota
+	FunctionKind
 	ConstructorKind
 	FallbackKind
 	ReceiveKind
 	EventKind
 	ErrorKind
 )
+
+func (s SignatureKind) String() string {
+	switch s {
+	case FunctionKind:
+		return "function"
+	case ConstructorKind:
+		return "constructor"
+	case FallbackKind:
+		return "fallback"
+	case ReceiveKind:
+		return "receive"
+	case EventKind:
+		return "event"
+	case ErrorKind:
+		return "error"
+	default:
+		return "unknown"
+	}
+}
 
 // DataLocation is the data location of the parameter, like storage, memory
 // or calldata.
@@ -92,6 +112,19 @@ const (
 	CallData
 	Memory
 )
+
+func (d DataLocation) String() string {
+	switch d {
+	case Storage:
+		return "storage"
+	case CallData:
+		return "calldata"
+	case Memory:
+		return "memory"
+	default:
+		return ""
+	}
+}
 
 // Signature represents a signature of a function, constructor, fallback,
 // receive, event or error.
@@ -329,7 +362,7 @@ func (p *parser) parseSignature() (Signature, error) {
 			}
 		}
 	}
-	if sig.Kind != EventKind {
+	if sig.Kind != UnknownKind && sig.Kind != EventKind {
 		for _, input := range sig.Inputs {
 			if input.Indexed {
 				return Signature{}, fmt.Errorf(`unexpected indexed flag`)
@@ -360,7 +393,7 @@ func (p *parser) parseSignatureKind() SignatureKind {
 	case p.readBytes([]byte("error")):
 		return ErrorKind
 	}
-	return FunctionKind
+	return UnknownKind
 }
 
 func (p *parser) parseInputs() ([]Parameter, error) {
