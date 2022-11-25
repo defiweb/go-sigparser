@@ -251,6 +251,15 @@ func TestParseSignature(t *testing.T) {
 				Outputs:   []Parameter{{Type: "int"}},
 			},
 		},
+		{
+			sig: "event foo(int a) anonymous",
+			want: Signature{
+				Kind:      EventKind,
+				Name:      "foo",
+				Modifiers: []string{"anonymous"},
+				Inputs:    []Parameter{{Type: "int", Name: "a"}},
+			},
+		},
 		//
 		// Allowed arguments for fallback function
 		{
@@ -338,7 +347,7 @@ func TestParseSignature(t *testing.T) {
 		{sig: "event foo(int) returns (int)", wantErr: true},    // events cannot have return values
 		{sig: "event foo(int memory a)", wantErr: true},         // event arguments cannot specify data location
 		{sig: "error foo()", wantErr: true},                     // errors must have arguments
-		{sig: "error foo(int) internal", wantErr: true},         // errors cannot have modifiers
+		{sig: "error foo(int) internal", wantErr: true},         // errors cannot have modifiers other than anonymous
 		{sig: "error foo() returns (int)", wantErr: true},       // errors cannot have return values
 		{sig: "error foo(int memory a)", wantErr: true},         // error arguments cannot specify data location
 		{sig: "error foo(int indexed a)", wantErr: true},        // indexed flag not allowed for non-events

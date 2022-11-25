@@ -338,7 +338,7 @@ func (p *parser) parseSignature() (Signature, error) {
 		if len(sig.Outputs) > 0 {
 			return Signature{}, fmt.Errorf(`unexpected event outputs`)
 		}
-		if len(sig.Modifiers) > 0 {
+		if !(len(sig.Modifiers) == 0 || (len(sig.Modifiers) == 1 && sig.Modifiers[0] == "anonymous")) {
 			return Signature{}, fmt.Errorf(`unexpected event modifiers`)
 		}
 		for _, input := range sig.Inputs {
