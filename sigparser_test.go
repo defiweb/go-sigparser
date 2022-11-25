@@ -8,6 +8,7 @@ import (
 
 func TestParseSignature(t *testing.T) {
 	tests := []struct {
+		kind    SignatureKind
 		sig     string
 		want    Signature
 		wantErr bool
@@ -220,6 +221,16 @@ func TestParseSignature(t *testing.T) {
 				Inputs: []Parameter{{Type: "uint256"}},
 			},
 		},
+		// With specified kind
+		{
+			kind: EventKind,
+			sig:  "foo(uint256)",
+			want: Signature{
+				Kind:   EventKind,
+				Name:   "foo",
+				Inputs: []Parameter{{Type: "uint256"}},
+			},
+		},
 		// Data location
 		{
 			sig: "foo(int memory a, int storage, int calldata)",
@@ -372,13 +383,13 @@ func TestParseSignature(t *testing.T) {
 	}
 	for n, tt := range tests {
 		t.Run(fmt.Sprintf("case-%d", n+1), func(t *testing.T) {
-			got, err := ParseSignature(tt.sig)
+			got, err := ParseSignatureAs(tt.kind, tt.sig)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ParseSignature() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ParseSignatureAs() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ParseSignature() got = %v, want %v", got, tt.want)
+				t.Errorf("ParseSignatureAs() got = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -40,9 +40,18 @@ import (
 // Signatures that are syntactically correct, but semantically invalid are
 // rejected by the parser.
 func ParseSignature(signature string) (Signature, error) {
+	return ParseSignatureAs(UnknownKind, signature)
+}
+
+// ParseSignatureAs works like ParseSignature, but it allows to specify the
+// signature kind.
+//
+// The kind can be UnknownKind, in which case the kind is inferred from the
+// signature.
+func ParseSignatureAs(kind SignatureKind, signature string) (Signature, error) {
 	p := &parser{in: []byte(signature)}
 	p.parseWhitespace()
-	sig, err := p.parseSignature()
+	sig, err := p.parseSignature(kind)
 	if err != nil {
 		return Signature{}, err
 	}
@@ -275,13 +284,19 @@ type parser struct {
 	pos int
 }
 
-func (p *parser) parseSignature() (Signature, error) {
+func (p *parser) parseSignature(kind SignatureKind) (Signature, error) {
 	var (
 		err error
 		sig Signature
 	)
 	// Parse signature type.
 	sig.Kind = p.parseSignatureKind()
+	if sig.Kind == UnknownKind {
+		sig.Kind = kind
+	}
+	if kind != UnknownKind && sig.Kind != kind {
+		return sig, fmt.Errorf("invalid signature kind: %s", sig.Kind)
+	}
 	// Parse name.
 	p.parseWhitespace()
 	sig.Name = string(p.parseName())
