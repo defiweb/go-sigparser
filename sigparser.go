@@ -19,23 +19,23 @@ import (
 // If the kind is not specified, it is assumed to be a function.
 // The following kinds are supported:
 //
-//  - function
-//  - constructor
-//  - fallback
-//  - receive
-//  - event
-//  - error
+//   - function
+//   - constructor
+//   - fallback
+//   - receive
+//   - event
+//   - error
 //
 // The following examples are valid signatures:
 //
-//  - function foo(uint256 memory a, tuple(uint256 b1, uint256 b2) memory b) internal returns (uint256)
-//  - function foo(uint256 a, (uint256 b1, uint256 b2) b) (uint256)
-//  - foo(uint256,(uint256,uint256))(uint256)
-//  - constructor(uint256 a, uint256 b)
-//  - fallback(bytes memory a) returns (bytes memory)
-//  - receive()
-//  - event Foo(uint256 a, uint256 b)
-//  - error Foo(uint256 a, uint256 b)
+//   - function foo(uint256 memory a, tuple(uint256 b1, uint256 b2) memory b) internal returns (uint256)
+//   - function foo(uint256 a, (uint256 b1, uint256 b2) b) (uint256)
+//   - foo(uint256,(uint256,uint256))(uint256)
+//   - constructor(uint256 a, uint256 b)
+//   - fallback(bytes memory a) returns (bytes memory)
+//   - receive()
+//   - event Foo(uint256 a, uint256 b)
+//   - error Foo(uint256 a, uint256 b)
 //
 // Signatures that are syntactically correct, but semantically invalid are
 // rejected by the parser.
@@ -76,6 +76,23 @@ func ParseParameter(signature string) (Parameter, error) {
 		return Parameter{}, fmt.Errorf(`unexpected character %q at the end of the parameter`, p.peek())
 	}
 	return typ, nil
+}
+
+// ParseStruct parses the struct definition.
+// It returns a structure as a tuple type where the tuple name is the struct name
+// and the tuple elements are the struct fields.
+func ParseStruct(definition string) (Parameter, error) {
+	p := &parser{in: []byte(definition)}
+	p.parseWhitespace()
+	str, err := p.parseStruct()
+	if err != nil {
+		return Parameter{}, err
+	}
+	p.parseWhitespace()
+	if p.hasNext() {
+		return Parameter{}, fmt.Errorf(`unexpected character %q at the end of the struct`, p.peek())
+	}
+	return str, nil
 }
 
 // SignatureKind is the kind of the signature, like function, constructor,
@@ -453,6 +470,55 @@ func (p *parser) parseOutputs() ([]Parameter, error) {
 		return args.Tuple, nil
 	}
 	return nil, nil
+}
+
+func (p *parser) parseStruct() (Parameter, error) {
+	s := Parameter{}
+	// Parse struct keyword.
+	if !p.readBytes([]byte("struct")) {
+		if !p.hasNext() {
+			return Parameter{}, fmt.Errorf(`unexpected end of input, 'struct' keyword expected`)
+		}
+		return Parameter{}, fmt.Errorf(`unexpected character %q, 'struct' keyword expected`, p.peek())
+	}
+	p.parseWhitespace()
+	// Parse struct name.
+	s.Name = string(p.parseName())
+	p.parseWhitespace()
+	// Parse struct fields.
+	if !p.readByte('{') {
+		if !p.hasNext() {
+			return Parameter{}, fmt.Errorf(`unexpected end of input, '{' expected`)
+		}
+		return Parameter{}, fmt.Errorf(`unexpected character %q, '{' expected`, p.peek())
+	}
+	for {
+		p.parseWhitespace()
+		if p.readByte('}') {
+			break
+		}
+		// Parse field type.
+		field, err := p.parseElementaryType()
+		if err != nil {
+			return Parameter{}, err
+		}
+		p.parseWhitespace()
+		// Parse field name.
+		field.Name = string(p.parseName())
+		if len(field.Name) == 0 {
+			return Parameter{}, fmt.Errorf(`unexpected end of input, field name expected`)
+		}
+		s.Tuple = append(s.Tuple, field)
+		p.parseWhitespace()
+		// Parse field separator.
+		if !p.readByte(';') {
+			if !p.hasNext() {
+				return Parameter{}, fmt.Errorf(`unexpected end of input, ';' expected`)
+			}
+			return Parameter{}, fmt.Errorf(`unexpected character %q, ';' expected`, p.peek())
+		}
+	}
+	return s, nil
 }
 
 // parseModifiers parses method modifiers.

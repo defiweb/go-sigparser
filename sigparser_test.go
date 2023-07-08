@@ -505,6 +505,65 @@ func TestParseParameter(t *testing.T) {
 	}
 }
 
+func TestParseStruct(t *testing.T) {
+	tests := []struct {
+		param   string
+		want    Parameter
+		wantErr bool
+	}{
+		// Valid syntax
+		{param: "struct test {int a; int b;}", want: Parameter{
+			Name: "test",
+			Tuple: []Parameter{
+				{Name: "a", Type: "int"}, {Name: "b", Type: "int"},
+			},
+		}},
+		// Valid multiline syntax
+		{param: "struct\ntest\n{\nint a;\nint b;\n}", want: Parameter{
+			Name: "test",
+			Tuple: []Parameter{
+				{Name: "a", Type: "int"}, {Name: "b", Type: "int"},
+			},
+		}},
+		// With array
+		{param: "struct test {int[1] a;}", want: Parameter{
+			Name: "test",
+			Tuple: []Parameter{
+				{Name: "a", Type: "int", Arrays: []int{1}},
+			},
+		}},
+		// Empty struct
+		{param: "struct test {}", want: Parameter{Name: "test"}},
+		// Whitespaces
+		{param: " struct test { int a ; int b ; } ", want: Parameter{
+			Name: "test",
+			Tuple: []Parameter{
+				{Name: "a", Type: "int"}, {Name: "b", Type: "int"},
+			},
+		}},
+		// Invalid syntax
+		{param: "struct test (int a; int b;)", wantErr: true},
+		{param: "struct test {int a; int b;", wantErr: true},
+		{param: "struct test {int a; int b}", wantErr: true},
+		{param: "struct test {int a; int b;};", wantErr: true},
+		{param: "struct test {int memory a;}", wantErr: true},
+		{param: "struct test {int a; int a;}[]", wantErr: true},
+		{param: "struct test {int a[]}", wantErr: true},
+	}
+	for n, tt := range tests {
+		t.Run(fmt.Sprintf("case-%d", n+1), func(t *testing.T) {
+			got, err := ParseStruct(tt.param)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ParseStruct() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ParseStruct() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSignatureString(t *testing.T) {
 	tests := []struct {
 		sig  Signature
@@ -597,6 +656,30 @@ func FuzzParseParameter(f *testing.F) {
 	}
 	f.Fuzz(func(t *testing.T, s string) {
 		_, _ = ParseParameter(s)
+	})
+}
+
+func FuzzParseStruct(f *testing.F) {
+	for _, s := range []string{
+		"struct",
+		"foo",
+		"(",
+		")",
+		"[",
+		"]",
+		",",
+		";",
+		"{",
+		"}",
+		"_",
+		"$",
+		" ",
+		"\n",
+	} {
+		f.Add(s)
+	}
+	f.Fuzz(func(t *testing.T, s string) {
+		_, _ = ParseStruct(s)
 	})
 }
 
