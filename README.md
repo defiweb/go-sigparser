@@ -1,13 +1,15 @@
 # go-sigparser
 
-The `go-sigparser` package provides a parser of Ethereum function, event and error signatures.
+The `go-sigparser` is a Go package that helps parse Ethereum function signatures. This parser uses the Solidity grammar
+rules.
 
-The parser is based on the Solidity grammar, but allows to omit argument names and the `returns` and `function`
-keywords, so it can parse full Solidity signatures as well as short signatures like: `bar(uint256,bytes32)`.
+However, it doesn't need argument names or the `returns` and `function` keywords to parse signatures. So, you can use it
+for both complete Solidity signatures and shorter versions like `bar(uint256,bytes32)`.
+
 Tuples are represented as a list of parameters, e.g. `(uint256,bytes32)`. The list can be optionally prefixed with
 `tuple` keyword, e.g. `tuple(uint256,bytes32)`.
 
-Examples of signatures that are supported by the parser:
+The `go-sigparser` supports many different signature formats. Here are a few examples:
 
 - `getPrice(string)`
 - `getPrice(string)((uint256,unit256))`
@@ -15,16 +17,20 @@ Examples of signatures that are supported by the parser:
 - `constructor(string symbol, string name)`
 - `receive() external payable`
 - `fallback (bytes calldata input) external payable returns (bytes memory output)`
-- `event PriceUpated(string indexed symbol, uint256 price)`
+- `event PriceUpdated(string indexed symbol, uint256 price)`
 - `error PriceExpired(string symbol, uint256 timestamp)`
 
 ## Installation
+
+You can install the `go-sigparser` package with this command:
 
 ```bash
 go get github.com/ethereum/go-sigparser
 ```
 
 ## Usage
+
+### Parsing Signature
 
 ```go
 package main
@@ -57,6 +63,59 @@ func main() {
 }
 ```
 
+### Parsing Parameter
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/defiweb/go-sigparser"
+)
+
+func main() {
+	param, err := sigparser.ParseParameter("(uint256 price, uint256 timestamp)")
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(param.Tuple[0].Name) // price
+	fmt.Println(param.Tuple[0].Type) // uint256
+	fmt.Println(param.Tuple[1].Name) // timestamp
+	fmt.Println(param.Tuple[1].Type) // uint256
+}
+```
+
+### Parsing Struct
+
+You can also parse structs with `go-sigparser`. When you parse a struct, you get a tuple where the struct name
+is the parameter name, and the struct fields are the tuple elements. Here's an example:
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/defiweb/go-sigparser"
+)
+
+func main() {
+	param, err := sigparser.ParseStruct("struct name { uint256 price; uint256 timestamp; }")
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(param.Name)          // name
+	fmt.Println(param.Tuple[0].Name) // price
+	fmt.Println(param.Tuple[0].Type) // uint256
+	fmt.Println(param.Tuple[1].Name) // timestamp
+	fmt.Println(param.Tuple[1].Type) // uint256
+}
+```
+
 ## Documentation
 
-[https://pkg.go.dev/github.com/defiweb/go-sigparser](https://pkg.go.dev/github.com/defiweb/go-sigparser)
+For more information about the `go-sigparser` package,
+visit [https://pkg.go.dev/github.com/defiweb/go-sigparser](https://pkg.go.dev/github.com/defiweb/go-sigparser).
