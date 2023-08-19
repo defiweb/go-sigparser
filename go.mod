@@ -1,3 +1,3 @@
 module github.com/defiweb/go-sigparser
 
-go 1.18
+go 1.21
