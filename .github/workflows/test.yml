@@ -14,7 +14,7 @@ jobs:
     name: Code Linting & Unit Tests
     strategy:
       matrix:
-        go-version: [ 1.21.x ]
+        go-version: [ 1.18.x ]
         os: [ ubuntu-latest ]
     runs-on: ${{ matrix.os }}
     steps:
