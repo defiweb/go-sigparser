@@ -679,7 +679,6 @@ func (p *parser) parseWhitespace() {
 		}
 		p.read()
 	}
-	return
 }
 
 // parseName parses name of the argument or method and returns it.
