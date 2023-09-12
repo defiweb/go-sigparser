@@ -379,9 +379,6 @@ func (p *parser) parseSignature(kind SignatureKind) (Signature, error) {
 			}
 		}
 	case ErrorKind:
-		if len(sig.Inputs) == 0 {
-			return Signature{}, fmt.Errorf(`error must have inputs`)
-		}
 		if len(sig.Outputs) > 0 {
 			return Signature{}, fmt.Errorf(`unexpected error outputs`)
 		}

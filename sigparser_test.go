@@ -357,7 +357,6 @@ func TestParseSignature(t *testing.T) {
 		{sig: "event foo(int) internal", wantErr: true},         // events cannot have modifiers
 		{sig: "event foo(int) returns (int)", wantErr: true},    // events cannot have return values
 		{sig: "event foo(int memory a)", wantErr: true},         // event arguments cannot specify data location
-		{sig: "error foo()", wantErr: true},                     // errors must have arguments
 		{sig: "error foo(int) internal", wantErr: true},         // errors cannot have modifiers other than anonymous
 		{sig: "error foo() returns (int)", wantErr: true},       // errors cannot have return values
 		{sig: "error foo(int memory a)", wantErr: true},         // error arguments cannot specify data location
