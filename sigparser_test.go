@@ -601,6 +601,66 @@ func TestSignatureString(t *testing.T) {
 	}
 }
 
+func TestKind(t *testing.T) {
+	tests := []struct {
+		input string
+		kind  InputKind
+	}{
+		{input: "foo", kind: TypeInput},
+		{input: "function foo", kind: TypeInput},
+		{input: "foo()", kind: FunctionSignatureInput},
+		{input: "function foo(int) returns (int)", kind: FunctionSignatureInput},
+		{input: "constructor", kind: TypeInput},
+		{input: "constructor()", kind: ConstructorSignatureInput},
+		{input: "fallback", kind: TypeInput},
+		{input: "fallback()", kind: FallbackSignatureInput},
+		{input: "receive", kind: TypeInput},
+		{input: "receive()", kind: ReceiveSignatureInput},
+		{input: "event", kind: TypeInput},
+		{input: "event foo", kind: TypeInput},
+		{input: "event foo(int)", kind: EventSignatureInput},
+		{input: "error", kind: TypeInput},
+		{input: "error foo", kind: TypeInput},
+		{input: "(int, int)", kind: TupleInput},
+		{input: "(int, int)[]", kind: ArrayInput},
+		{input: "tuple", kind: TypeInput},
+		{input: "tuple(int, int)", kind: TupleInput},
+		{input: "tuple(int, int)[]", kind: ArrayInput},
+		{input: "int", kind: TypeInput},
+		{input: "int[]", kind: ArrayInput},
+		{input: "struct", kind: TypeInput},
+		{input: "struct foo", kind: TypeInput},
+		{input: "struct foo { int a; int b; }", kind: StructDefinitionInput},
+
+		// White spaces:
+		{input: " int ", kind: TypeInput},
+		{input: " int[] ", kind: ArrayInput},
+		{input: " ( int , int ) ", kind: TupleInput},
+		{input: " ( int , int )[] ", kind: ArrayInput},
+		{input: " function foo ( int ) returns ( int ) ", kind: FunctionSignatureInput},
+		{input: " struct foo { int a ; int b ; } ", kind: StructDefinitionInput},
+
+		// Unexpected characters at the end:
+		{input: "int !", kind: InvalidInput},
+		{input: "int() !", kind: InvalidInput},
+		{input: "(int) !", kind: InvalidInput},
+		{input: "(int)[] !", kind: InvalidInput},
+		{input: "tuple !", kind: InvalidInput},
+		{input: "tuple() !", kind: InvalidInput},
+		{input: "tuple(int) !", kind: InvalidInput},
+		{input: "tuple(int)[] !", kind: InvalidInput},
+		{input: "struct !", kind: InvalidInput},
+		{input: "struct { int a; int b; } !", kind: InvalidInput},
+	}
+	for n, tt := range tests {
+		t.Run(fmt.Sprintf("case-%d", n+1), func(t *testing.T) {
+			if got := Kind(tt.input); got != tt.kind {
+				t.Errorf("Kind() = %v, want %v", got, tt.kind)
+			}
+		})
+	}
+}
+
 func FuzzParseSignature(f *testing.F) {
 	for _, s := range []string{
 		"function",

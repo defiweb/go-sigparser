@@ -15,8 +15,7 @@ import (
 // Tuples are represented as a list of types enclosed in parentheses, optionally
 // prefixed with the "tuple" keyword.
 //
-// Signature can be prepended with the keyword describing the signature kind.
-// If the kind is not specified, it is assumed to be a function.
+// Signature may be prepended with the keyword describing the signature kind.
 // The following kinds are supported:
 //
 //   - function
@@ -55,8 +54,7 @@ func ParseSignatureAs(kind SignatureKind, signature string) (Signature, error) {
 	if err != nil {
 		return Signature{}, err
 	}
-	p.parseWhitespace()
-	if p.hasNext() {
+	if !p.hasOnlyWhitespace() {
 		return Signature{}, fmt.Errorf(`unexpected character %q at the end of the signature`, p.peek())
 	}
 	return sig, nil
@@ -71,16 +69,16 @@ func ParseParameter(signature string) (Parameter, error) {
 	if err != nil {
 		return Parameter{}, err
 	}
-	p.parseWhitespace()
-	if p.hasNext() {
+	if !p.hasOnlyWhitespace() {
 		return Parameter{}, fmt.Errorf(`unexpected character %q at the end of the parameter`, p.peek())
 	}
 	return typ, nil
 }
 
 // ParseStruct parses the struct definition.
-// It returns a structure as a tuple type where the tuple name is the struct name
-// and the tuple elements are the struct fields.
+//
+// It returns a structure as a tuple type where the tuple name is the struct
+// name and the tuple elements are the struct fields.
 func ParseStruct(definition string) (Parameter, error) {
 	p := &parser{in: []byte(definition)}
 	p.parseWhitespace()
@@ -88,11 +86,136 @@ func ParseStruct(definition string) (Parameter, error) {
 	if err != nil {
 		return Parameter{}, err
 	}
-	p.parseWhitespace()
-	if p.hasNext() {
+	if !p.hasOnlyWhitespace() {
 		return Parameter{}, fmt.Errorf(`unexpected character %q at the end of the struct`, p.peek())
 	}
 	return str, nil
+}
+
+// Kind returns the kind of the input string.
+//
+// This function helps determine which parser should be used to parse the
+// input.
+//
+// Note that some inputs are ambiguous. They could be interpreted either
+// as a type or a function signature. For example, "foo" could be a type or a
+// function name. Similarly, "function foo" could be interpreted as a function
+// signature or a parameter "foo" with the type "function".
+//
+// To avoid ambiguity, always add an empty parameter list to function
+// signatures.
+func Kind(input string) (k InputKind) {
+	p := &parser{in: []byte(input)}
+	p.parseWhitespace()
+	pos := p.pos
+	if param, err := p.parseParameter(); err == nil && p.hasOnlyWhitespace() {
+		if len(param.Arrays) > 0 {
+			return ArrayInput
+		}
+		if len(param.Tuple) > 0 {
+			return TupleInput
+		}
+		return TypeInput
+	}
+	p.pos = pos
+	if sig, err := p.parseSignature(UnknownKind); err == nil && p.hasOnlyWhitespace() {
+		switch sig.Kind {
+		case FunctionKind, UnknownKind:
+			return FunctionSignatureInput
+		case ConstructorKind:
+			return ConstructorSignatureInput
+		case FallbackKind:
+			return FallbackSignatureInput
+		case ReceiveKind:
+			return ReceiveSignatureInput
+		case EventKind:
+			return EventSignatureInput
+		case ErrorKind:
+			return ErrorSignatureInput
+		}
+	}
+	p.pos = pos
+	if _, err := p.parseStruct(); err == nil && p.hasOnlyWhitespace() {
+		return StructDefinitionInput
+	}
+	return InvalidInput
+}
+
+// InputKind is the kind of the input string returned by the Kind function.
+type InputKind int8
+
+const (
+	InvalidInput InputKind = iota
+	TypeInput
+	ArrayInput
+	TupleInput
+	StructDefinitionInput
+	FunctionSignatureInput
+	ConstructorSignatureInput
+	FallbackSignatureInput
+	ReceiveSignatureInput
+	EventSignatureInput
+	ErrorSignatureInput
+)
+
+func (k InputKind) String() string {
+	switch k {
+	case InvalidInput:
+		return "invalid"
+	case TypeInput:
+		return "type"
+	case ArrayInput:
+		return "array"
+	case TupleInput:
+		return "tuple"
+	case StructDefinitionInput:
+		return "struct"
+	case FunctionSignatureInput:
+		return "function"
+	case ConstructorSignatureInput:
+		return "constructor"
+	case FallbackSignatureInput:
+		return "fallback"
+	case ReceiveSignatureInput:
+		return "receive"
+	case EventSignatureInput:
+		return "event"
+	case ErrorSignatureInput:
+		return "error"
+	default:
+		return "unknown"
+	}
+}
+
+// IsSignature returns true if the input is a signature for any type of function.
+//
+// It can be parsed using ParseSignature function.
+func (k InputKind) IsSignature() bool {
+	switch k {
+	case FunctionSignatureInput, ConstructorSignatureInput, FallbackSignatureInput, ReceiveSignatureInput, EventSignatureInput, ErrorSignatureInput:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsParameter returns true if the input is a parameter.
+//
+// It can be parsed using ParseParameter function.
+func (k InputKind) IsParameter() bool {
+	switch k {
+	case TypeInput, ArrayInput, TupleInput:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsStruct returns true if the input is a struct definition.
+//
+// It can be parsed using ParseStruct function.
+func (k InputKind) IsStruct() bool {
+	return k == StructDefinitionInput
 }
 
 // SignatureKind is the kind of the signature, like function, constructor,
@@ -746,6 +869,17 @@ func (p *parser) parseArray() ([]int, error) {
 		break
 	}
 	return arr, nil
+}
+
+// hasOnlyWhitespace returns true if there are only whitespaces left in the
+// input or if the remaining input is empty.
+func (p *parser) hasOnlyWhitespace() bool {
+	for pos := p.pos; pos < len(p.in); pos++ {
+		if !isWhitespace(p.in[pos]) {
+			return false
+		}
+	}
+	return true
 }
 
 // hasNext returns true if there are more bytes to read.
