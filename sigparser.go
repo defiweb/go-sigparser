@@ -54,7 +54,7 @@ func ParseSignatureAs(kind SignatureKind, signature string) (Signature, error) {
 	if err != nil {
 		return Signature{}, err
 	}
-	if !p.hasOnlyWhitespace() {
+	if !p.onlyWhitespaceOrDelimiterLeft() {
 		return Signature{}, fmt.Errorf(`unexpected character %q at the end of the signature`, p.peek())
 	}
 	return sig, nil
@@ -69,7 +69,7 @@ func ParseParameter(signature string) (Parameter, error) {
 	if err != nil {
 		return Parameter{}, err
 	}
-	if !p.hasOnlyWhitespace() {
+	if !p.onlyWhitespaceOrDelimiterLeft() {
 		return Parameter{}, fmt.Errorf(`unexpected character %q at the end of the parameter`, p.peek())
 	}
 	return typ, nil
@@ -86,7 +86,7 @@ func ParseStruct(definition string) (Parameter, error) {
 	if err != nil {
 		return Parameter{}, err
 	}
-	if !p.hasOnlyWhitespace() {
+	if !p.onlyWhitespaceOrDelimiterLeft() {
 		return Parameter{}, fmt.Errorf(`unexpected character %q at the end of the struct`, p.peek())
 	}
 	return str, nil
@@ -108,7 +108,7 @@ func Kind(input string) (k InputKind) {
 	p := &parser{in: []byte(input)}
 	p.parseWhitespace()
 	pos := p.pos
-	if param, err := p.parseParameter(); err == nil && p.hasOnlyWhitespace() {
+	if param, err := p.parseParameter(); err == nil && p.onlyWhitespaceOrDelimiterLeft() {
 		if len(param.Arrays) > 0 {
 			return ArrayInput
 		}
@@ -118,7 +118,7 @@ func Kind(input string) (k InputKind) {
 		return TypeInput
 	}
 	p.pos = pos
-	if sig, err := p.parseSignature(UnknownKind); err == nil && p.hasOnlyWhitespace() {
+	if sig, err := p.parseSignature(UnknownKind); err == nil && p.onlyWhitespaceOrDelimiterLeft() {
 		switch sig.Kind {
 		case FunctionKind, UnknownKind:
 			return FunctionSignatureInput
@@ -135,7 +135,7 @@ func Kind(input string) (k InputKind) {
 		}
 	}
 	p.pos = pos
-	if _, err := p.parseStruct(); err == nil && p.hasOnlyWhitespace() {
+	if _, err := p.parseStruct(); err == nil && p.onlyWhitespaceOrDelimiterLeft() {
 		return StructDefinitionInput
 	}
 	return InvalidInput
@@ -871,11 +871,11 @@ func (p *parser) parseArray() ([]int, error) {
 	return arr, nil
 }
 
-// hasOnlyWhitespace returns true if there are only whitespaces left in the
+// onlyWhitespaceOrDelimiterLeft returns true if there are only whitespaces left in the
 // input or if the remaining input is empty.
-func (p *parser) hasOnlyWhitespace() bool {
+func (p *parser) onlyWhitespaceOrDelimiterLeft() bool {
 	for pos := p.pos; pos < len(p.in); pos++ {
-		if !isWhitespace(p.in[pos]) {
+		if !isWhitespace(p.in[pos]) && p.in[pos] != ';' {
 			return false
 		}
 	}

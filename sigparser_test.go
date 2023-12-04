@@ -98,6 +98,18 @@ func TestParseSignature(t *testing.T) {
 				Outputs: []Parameter{{Type: "uint256"}},
 			},
 		},
+		{
+			sig:  "foo();", // semicolon is allowed
+			want: Signature{Name: "foo"},
+		},
+		{
+			sig:  "foo();;", // multiple semicolons are allowed
+			want: Signature{Name: "foo"},
+		},
+		{
+			sig:  "foo() ;; ", // whitespaces with semicolons are allowed
+			want: Signature{Name: "foo"},
+		},
 		// Tuples
 		{
 			sig: "foo((uint256,bool))", // with one tuple argument
@@ -473,6 +485,10 @@ func TestParseParameter(t *testing.T) {
 		{param: "int ", want: Parameter{Type: "int"}},
 		{param: " int  memory  a  ", want: Parameter{Type: "int", Name: "a", DataLocation: Memory}},
 		{param: "\nint[1]\na", want: Parameter{Type: "int", Arrays: []int{1}, Name: "a"}},
+		// Semicolons
+		{param: "int;", want: Parameter{Type: "int"}},
+		{param: "int;;", want: Parameter{Type: "int"}},
+		{param: "int ;; ", want: Parameter{Type: "int"}},
 		// Invalid syntax
 		{param: "int[", wantErr: true},
 		{param: "int[1", wantErr: true},
@@ -540,11 +556,14 @@ func TestParseStruct(t *testing.T) {
 				{Name: "a", Type: "int"}, {Name: "b", Type: "int"},
 			},
 		}},
+		// Semicolons
+		{param: "struct test {};", want: Parameter{Name: "test"}},
+		{param: "struct test {};;", want: Parameter{Name: "test"}},
+		{param: "struct test {} ;; ", want: Parameter{Name: "test"}},
 		// Invalid syntax
 		{param: "struct test (int a; int b;)", wantErr: true},
 		{param: "struct test {int a; int b;", wantErr: true},
 		{param: "struct test {int a; int b}", wantErr: true},
-		{param: "struct test {int a; int b;};", wantErr: true},
 		{param: "struct test {int memory a;}", wantErr: true},
 		{param: "struct test {int a; int a;}[]", wantErr: true},
 		{param: "struct test {int a[]}", wantErr: true},
@@ -632,13 +651,19 @@ func TestKind(t *testing.T) {
 		{input: "struct foo", kind: TypeInput},
 		{input: "struct foo { int a; int b; }", kind: StructDefinitionInput},
 
-		// White spaces:
+		// White spaces and semicolons:
 		{input: " int ", kind: TypeInput},
+		{input: " int ; ", kind: TypeInput},
 		{input: " int[] ", kind: ArrayInput},
+		{input: " int[] ; ", kind: ArrayInput},
 		{input: " ( int , int ) ", kind: TupleInput},
+		{input: " ( int , int ) ; ", kind: TupleInput},
 		{input: " ( int , int )[] ", kind: ArrayInput},
+		{input: " ( int , int )[] ; ", kind: ArrayInput},
 		{input: " function foo ( int ) returns ( int ) ", kind: FunctionSignatureInput},
+		{input: " function foo ( int ) returns ( int ) ; ", kind: FunctionSignatureInput},
 		{input: " struct foo { int a ; int b ; } ", kind: StructDefinitionInput},
+		{input: " struct foo { int a ; int b ; } ; ", kind: StructDefinitionInput},
 
 		// Unexpected characters at the end:
 		{input: "int !", kind: InvalidInput},
